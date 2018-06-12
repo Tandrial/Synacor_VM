@@ -2,7 +2,7 @@ package de.mkrane.synacor.vm;
 
 import java.io.*;
 
-public class VM {
+class VM {
   private int[] ram, stack;
   private int pc, sp;
   private boolean running;
@@ -10,12 +10,12 @@ public class VM {
   private Reader input;
   private final File script;
 
-  public VM(File script) throws IOException {
+  private VM(File script) throws IOException {
     this.script = script;
     reset();
   }
 
-  public void reset() throws IOException {
+  private void reset() throws IOException {
     ram = new int[1 << 16];
     stack = new int[1 << 16];
     pc = 0;
@@ -25,7 +25,7 @@ public class VM {
         : new InputStreamReader(new FileInputStream(script));
   }
 
-  public void loadProgram(File file) throws IOException {
+  private void loadProgram(File file) throws IOException {
     DataInputStream input = new DataInputStream(new FileInputStream(file));
     int pos = 0;
     while (input.available() > 0)
@@ -48,7 +48,7 @@ public class VM {
       ram[pc] = value;
   }
 
-  public void run() throws IOException {
+  private void run() throws IOException {
     running = true;
     while (running)
       doStep();
@@ -56,7 +56,7 @@ public class VM {
     input.close();
   }
 
-  public void doStep() throws IOException {
+  private void doStep() throws IOException {
     int a, b, c;
     INSTRUCTION opCode = INSTRUCTION.fromInt(ram[pc]);
     a = getValue(pc + 1);
@@ -159,14 +159,22 @@ public class VM {
           // Override actual function call
           ram[5489] = INSTRUCTION.NOP.ordinal();
           ram[5490] = INSTRUCTION.NOP.ordinal();
-          // [5491] eq r1 r0 6 ==> [5491] eq r1 r0 r0
+          // [5491] eq r1 r0 6 Change the last parameter from 6 to r0: r0 == r0
           ram[5494] = 0x8000;
-          break;
+          val = input.read();
+        }
+        if (val == '*') {
+          running = false;
+        }
+        if (val == '+') {
+          Dissassembler.dissambleToFile(this.ram, "./res/diss_dec.txt");
+          val = input.read();
         }
         // Windows \r\n ==> \n
         if (val == '\r')
           val = input.read();
-
+        if (val != '\n')
+          System.out.print((char) val);
         setValue(pc + 1, val);
         pc += 2;
         break;

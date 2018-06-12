@@ -50,10 +50,10 @@ north
 take teleporter
 use teleporter
 take business card
+look business card
 take strange book
 look strange book
-inv
-outside
++outside
 #use teleporter
 north
 north
@@ -84,3 +84,4 @@ east
 vault
 take mirror
 use mirror
+*

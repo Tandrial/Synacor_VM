@@ -1,11 +1,26 @@
 package de.mkrane.synacor.vm;
 
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class Dissassembler {
+class Dissassembler {
+
+  static void dissambleToFile(int[] ram, String file) throws IOException {
+    Dissassembler diss = new Dissassembler();
+
+    diss.ram = Arrays.copyOf(ram, 0x8000 + 8);
+    diss.pos = diss.ram.length;
+    Files.write(Paths.get(file), diss.dissassemble());
+    System.out.println("done");
+  }
+
   private List<String> out = null;
   private int[] ram = new int[1 << 16];
   private int pos;
@@ -17,16 +32,6 @@ public class Dissassembler {
       ram[pos++] = input.readUnsignedByte() + (input.readUnsignedByte() << 8);
     input.close();
     out = null;
-  }
-
-  public void copyToDiss(int[] ram) throws IOException {
-    this.ram = Arrays.copyOf(ram, ram.length);
-    this.pos = ram.length;
-    FileWriter writer = new FileWriter("output.txt");
-    for (String str : dissassemble())
-      writer.write(str + "\n");
-    writer.close();
-    System.out.println("done");
   }
 
   private List<String> dissassemble() {
@@ -157,12 +162,9 @@ public class Dissassembler {
   }
 
   public static void main(String[] args) throws IOException {
-    PrintStream old = System.out;
-    System.setOut(new PrintStream(new File("./res/diss.txt")));
     Dissassembler diss = new Dissassembler();
     diss.loadRam(new File("./res/challenge.bin"));
-    diss.dissassemble().forEach(System.out::println);
-    System.setOut(old);
+    Files.write(Paths.get("./res/diss_enc.txt"), diss.dissassemble());
     System.out.println("done");
   }
 }
