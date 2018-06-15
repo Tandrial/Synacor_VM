@@ -16,7 +16,7 @@ class VM {
   }
 
   private void reset() throws IOException {
-    ram = new int[1 << 16];
+    ram = new int[(1 << 15) + 8];
     stack = new int[1 << 16];
     pc = 0;
     sp = -1;
@@ -57,11 +57,10 @@ class VM {
   }
 
   private void doStep() throws IOException {
-    int a, b, c;
     INSTRUCTION opCode = INSTRUCTION.fromInt(ram[pc]);
-    a = getValue(pc + 1);
-    b = getValue(pc + 2);
-    c = getValue(pc + 3);
+    int a = getValue(pc + 1);
+    int b = getValue(pc + 2);
+    int c = getValue(pc + 3);
     switch (opCode) {
       case HALT: // halt: 0
         running = false;
@@ -159,7 +158,7 @@ class VM {
           // Override actual function call
           ram[5489] = INSTRUCTION.NOP.ordinal();
           ram[5490] = INSTRUCTION.NOP.ordinal();
-          // [5491] eq r1 r0 6 Change the last parameter from 6 to r0: r0 == r0
+          // [5491] eq r1 r0 6 Change the last parameter from 6 to r0: eq r1 r0 r0
           ram[5494] = 0x8000;
           val = input.read();
         }

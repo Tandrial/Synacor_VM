@@ -15,14 +15,14 @@ class Dissassembler {
   static void dissambleToFile(int[] ram, String file) throws IOException {
     Dissassembler diss = new Dissassembler();
 
-    diss.ram = Arrays.copyOf(ram, 0x8000 + 8);
-    diss.pos = diss.ram.length;
+    diss.ram = Arrays.copyOf(ram, ram.length);
+    diss.pos = ram.length;
     Files.write(Paths.get(file), diss.dissassemble());
     System.out.println("done");
   }
 
   private List<String> out = null;
-  private int[] ram = new int[1 << 16];
+  private int[] ram = new int[(1 << 15) + 8];
   private int pos;
 
   private void loadRam(File file) throws IOException {
@@ -39,7 +39,7 @@ class Dissassembler {
       return out;
     out = new ArrayList<>();
     for (int pc = 0; pc < pos; ) {
-      String line = "";
+      String line;
       if (pc >= 6068) {
         if (ram[pc] >= 32 && ram[pc] < 127)
           line = (String.format("[%d] '%c' %d", pc, ram[pc], ram[pc]));
@@ -50,21 +50,31 @@ class Dissassembler {
         INSTRUCTION opCode = INSTRUCTION.fromInt(ram[pc]);
         switch (opCode) {
           case HALT: // halt: 0
-            line = (String.format("[%d] halt", pc));
+          case RET: // ret: 18
+          case NOP: // noop: 21
+            line = appendInfo(opCode, pc, 0);
             pc++;
             break;
           case SET: // set: 1 a b
             if (ram[pc + 2] >= 0x8000)
-              line = (String.format("[%d] set r%d = r%d", pc, ram[pc + 1] - 0x8000, ram[pc + 2] - 0x8000));
+              line = (String.format("[%d] SET r%d = r%d", pc, ram[pc + 1] - 0x8000, ram[pc + 2] - 0x8000));
             else
-              line = (String.format("[%d] set r%d = %d", pc, ram[pc + 1] - 0x8000, ram[pc + 2]));
+              line = (String.format("[%d] SET r%d = %d", pc, ram[pc + 1] - 0x8000, ram[pc + 2]));
             pc += 3;
             break;
           case PUSH: // push: 2 a
           case POP: // pop: 3 a
+          case JMP: // jmp: 6 a
           case CALL: // call: 17 a
-            line += appendStack(opCode, pc);
+          case IN: // in: 20 a
+            line = appendStack(opCode, pc);
             pc += 2;
+            break;
+          case JT: // jt: 7 a b
+          case JF: // jf: 8 a b
+          case NOT: // not: 14 a b
+            line = appendInfo(opCode, pc, 2);
+            pc += 3;
             break;
           case EQ: // eq: 4 a b c
           case GT: // gt: 5 a b c
@@ -73,52 +83,26 @@ class Dissassembler {
           case MOD: // mod: 11 a b c
           case AND: // and: 12 a b c
           case OR: // or: 13 a b c
-            line += appendInfo(opCode, pc, 3);
+            line = appendInfo(opCode, pc, 3);
             pc += 4;
-            break;
-          case JMP: // jmp: 6 a
-            line = String.format("[%d] jmp %d", pc, ram[pc + 1]);
-            pc += 2;
-            break;
-          case JT: // jt: 7 a b
-          case JF: // jf: 8 a b
-          case NOT: // not: 14 a b
-            line += appendInfo(opCode, pc, 2);
-            pc += 3;
             break;
           case RMEM: // rmem: 15 a b
           case WMEM: // wmem: 16 a b
-            line += appendMemInfo(opCode, pc);
+            line = appendMemInfo(opCode, pc);
             pc += 3;
-            break;
-          case RET: // ret: 18
-            line = (String.format("[%d] ret", pc));
-            pc += 1;
             break;
           case OUT: // out: 19 a
             if (ram[pc + 1] >= 0x8000)
-              line = (String.format("[%d] out r%d", pc, ram[pc + 1] - 0x8000));
+              line = (String.format("[%d] OUT r%d", pc, ram[pc + 1] - 0x8000));
             else if (ram[pc + 1] != '\n')
-              line = (String.format("[%d] out '%c' %d", pc, (char) ram[pc + 1], ram[pc + 1]));
+              line = (String.format("[%d] OUT '%c' %d", pc, (char) ram[pc + 1], ram[pc + 1]));
             else
-              line = (String.format("[%d] out '\\n' %d", pc, ram[pc + 1]));
+              line = (String.format("[%d] OUT '\\n' %d", pc, ram[pc + 1]));
             pc += 2;
             break;
-          case IN: // in: 20 a
-            if (ram[pc + 1] >= 0x8000)
-              line = (String.format("[%d] in r%d", pc, ram[pc + 1] - 0x8000));
-            else
-              line = (String.format("[%d] in %d", pc, ram[pc + 1]));
-            pc += 2;
-            break;
-          case NOP: // noop: 21
-            line = (String.format("[%d] nop", pc));
-            pc += 1;
-            break;
-          case ERR:
-            line = (String.format("[%d] err %d", pc, ram[pc]));
-            pc += 1;
           default:
+            line = (String.format("[%d] ERR %d", pc, ram[pc]));
+            pc += 1;
             break;
         }
       }
@@ -129,7 +113,7 @@ class Dissassembler {
 
   private String appendInfo(INSTRUCTION op, int pc, int count) {
     StringBuilder sb = new StringBuilder();
-    sb.append("[").append(pc).append("] ").append(op.toString().toLowerCase());
+    sb.append("[").append(pc).append("] ").append(op.toString());
     for (int i = 1; i <= count; i++)
       if (ram[pc + i] >= 0x8000)
         sb.append(" r").append(ram[pc + i] - 0x8000);
@@ -147,7 +131,7 @@ class Dissassembler {
 
   private String appendMemInfo(INSTRUCTION op, int pc) {
     StringBuilder sb = new StringBuilder();
-    sb.append("[").append(pc).append("] ").append(op.toString().toLowerCase());
+    sb.append("[").append(pc).append("] ").append(op.toString());
 
     if (ram[pc + 1] >= 0x8000)
       sb.append(" r").append(ram[pc + 1] - 0x8000);
